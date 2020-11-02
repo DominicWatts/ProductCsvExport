@@ -1,0 +1,34 @@
+{
+    "name": "dominicwatts/productcsvexport",
+    "description": "Magento 2 product CSV export",
+    "type": "magento2-module",
+    "license": "OSL-3.0",
+    "version": "1.0.0",
+    "authors": [
+        {
+            "name": "Dominic Xigen",
+            "email": "dominic@xigen.co.uk"
+        }
+    ],
+    "minimum-stability": "dev",
+    "repositories": [
+        {
+            "type": "composer",
+            "url": "https://repo.magento.com/"
+        }
+    ],
+    "require": {
+        "magento/framework": "*",
+        "php": "~7.1.0||~7.2.0||~7.3.0",
+        "symfony/console": "*",
+        "magento/module-catalog": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "Xigen\\Export\\": ""
+        },
+        "files": [
+            "registration.php"
+        ]
+    }
+}
