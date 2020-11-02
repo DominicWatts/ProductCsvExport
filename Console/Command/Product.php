@@ -280,7 +280,7 @@ class Product extends Command
      * Resolve and flatten export data
      * @return array
      */
-    public function cleanse($product)
+    public function cleanse($product) // phpcs:ignore 
     {
         $productArray = [];
         foreach ($this->attributes as $attribute) {
