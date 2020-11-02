@@ -175,10 +175,16 @@ class Product extends Command
 
     /**
      * Product constructor.
-     * @param LoggerInterface $logger
-     * @param State $state
-     * @param DateTime $dateTime
-     * @param ProgressBarFactory $progressBarFactory
+     * @param \Psr\Log\LoggerInterface $logger
+     * @param \Magento\Framework\App\State $state
+     * @param \Magento\Framework\Stdlib\DateTime\DateTime $dateTime
+     * @param \Symfony\Component\Console\Helper\ProgressBarFactory $progressBarFactory
+     * @param \Magento\Catalog\Model\ResourceModel\Product\CollectionFactory $productCollectionFactory
+     * @param \Magento\CatalogInventory\Helper\Stock $stockFilter
+     * @param \Magento\Framework\File\Csv $csv
+     * @param \Magento\Store\Model\StoreManagerInterface $storeManager
+     * @param \Magento\Framework\Filesystem $filesystem
+     * @param \Magento\Framework\Filesystem\Driver\File $file
      */
     public function __construct(
         LoggerInterface $logger,
