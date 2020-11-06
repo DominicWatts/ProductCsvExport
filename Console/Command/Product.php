@@ -3,6 +3,7 @@
 namespace Xigen\Export\Console\Command;
 
 use Magento\Catalog\Model\Product\Type as ProductType;
+use Magento\Catalog\Model\ProductFactory;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory;
 use Magento\CatalogInventory\Helper\Stock;
 use Magento\Framework\App\Area;
@@ -11,6 +12,7 @@ use Magento\Framework\App\State;
 use Magento\Framework\File\Csv;
 use Magento\Framework\Filesystem;
 use Magento\Framework\Filesystem\Driver\File;
+use Magento\Framework\Model\ResourceModel\Iterator;
 use Magento\Framework\Phrase;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use Magento\Framework\UrlInterface;
@@ -124,6 +126,11 @@ class Product extends Command
     protected $progressBarFactory;
 
     /**
+     * @var ProgressBarFactory
+     */
+    protected $progress;
+
+    /**
      * @var \Magento\Catalog\Model\ResourceModel\Product\CollectionFactory
      */
     protected $productCollectionFactory;
@@ -174,11 +181,34 @@ class Product extends Command
     protected $storeId;
 
     /**
-     * Product constructor.
-     * @param LoggerInterface $logger
-     * @param State $state
-     * @param DateTime $dateTime
-     * @param ProgressBarFactory $progressBarFactory
+     * @var array
+     */
+    protected $entries;
+
+    /**
+     * @var \Magento\Framework\Model\ResourceModel\Iterator
+     */
+    protected $iterator;
+
+    /**
+     * @var \Magento\Catalog\Model\ProductFactory
+     */
+    protected $productFactory;
+
+    /**
+     * Product constructor
+     * @param \Psr\Log\LoggerInterface $logger
+     * @param \Magento\Framework\App\State $state
+     * @param \Magento\Framework\Stdlib\DateTime\DateTime $dateTime
+     * @param \Symfony\Component\Console\Helper\ProgressBarFactory $progressBarFactory
+     * @param \Magento\Catalog\Model\ResourceModel\Product\CollectionFactory $productCollectionFactory
+     * @param \Magento\CatalogInventory\Helper\Stock $stockFilter
+     * @param \Magento\Framework\File\Csv $csv
+     * @param \Magento\Store\Model\StoreManagerInterface $storeManager
+     * @param \Magento\Framework\Filesystem $filesystem
+     * @param \Magento\Framework\Filesystem\Driver\File $file
+     * @param \Magento\Framework\Model\ResourceModel\Iterator $iterator
+     * @param \Magento\Catalog\Model\ProductFactory $productFactory
      */
     public function __construct(
         LoggerInterface $logger,
@@ -190,7 +220,9 @@ class Product extends Command
         Csv $csv,
         StoreManagerInterface $storeManager,
         Filesystem $filesystem,
-        File $file
+        File $file,
+        Iterator $iterator,
+        ProductFactory $productFactory
     ) {
         $this->logger = $logger;
         $this->state = $state;
@@ -202,6 +234,8 @@ class Product extends Command
         $this->storeManager = $storeManager;
         $this->filesystem = $filesystem;
         $this->file = $file;
+        $this->iterator = $iterator;
+        $this->productFactory = $productFactory;
         parent::__construct();
     }
 
@@ -242,45 +276,69 @@ class Product extends Command
             $this->attributes
         );
 
-        /** @var ProgressBar $progress */
-        $progress = $this->progressBarFactory->create(
+        /** @var ProgressBar */
+        $this->progress = $this->progressBarFactory->create(
             [
                 'output' => $this->output,
                 'max' => count($products)
             ]
         );
 
-        $progress->setFormat(
+        $this->progress->setFormat(
             "%current%/%max% [%bar%] %percent:3s%% %elapsed% %memory:6s% \t| <info>%message%</info>"
         );
 
         if ($output->getVerbosity() !== OutputInterface::VERBOSITY_NORMAL) {
-            $progress->setOverwrite(false);
+            $this->progress->setOverwrite(false);
         }
 
-        $entries = [];
-        foreach ($products as $product) {
-            $entries[] = $this->cleanse($product);
-            $progress->setMessage((string) __('Product: %1', $product->getSku()));
-            $progress->advance();
-        }
+        $this->entries = [];
 
-        $this->generateFile($entries, self::ROW_ENCLOSURE, self::ROW_DELIMITER, $this->storeId, $this->fullPath);
+        $this->iterator->walk($products->getSelect(), [[$this, 'loop']]);
 
-        $progress->finish();
+        $this->generateFile($this->entries, self::ROW_ENCLOSURE, self::ROW_DELIMITER, $this->storeId, $this->fullPath);
+
+        $this->progress->finish();
         $this->output->writeln('');
 
         $this->output->writeln((string) __(
             '[%1] Finish',
             $this->dateTime->gmtDate()
         ));
+
+        $this->output->writeln((string) __(
+            'Memory: %1 MiB',
+            number_format(memory_get_peak_usage() / 1024 / 1024, 4)
+        ));
+    }
+
+    /**
+     * Loop callback
+     * @param array $args
+     * @return mixed
+     */
+    public function loop($args)
+    {
+        $row = $args['row'];
+        $this->progress->setMessage((string) __('Product: %1', $row['sku']));
+        $this->progress->advance();
+        try {
+            $product = $this->productFactory->create()
+                ->setStoreId($this->storeId)
+                ->load($row['entity_id']);
+
+            $this->entries[] = $this->cleanse($product);
+
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 
     /**
      * Resolve and flatten export data
      * @return array
      */
-    public function cleanse($product) // phpcs:ignore 
+    public function cleanse($product) // phpcs:ignore
     {
         $productArray = [];
         foreach ($this->attributes as $attribute) {
