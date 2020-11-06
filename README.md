@@ -23,3 +23,11 @@ Command line tool to export product CSV data in logical format. Useful for dumpi
 Check `./pub/media/xigen/product-export.csv`
 
 Create `./pub/media/xigen` if not exist
+
+## Notes
+
+Version 1.0.2 uses iterator
+
+Version < 1.0.2 uses product collection
+
+Iterator should handle much larger collections but is much slower
